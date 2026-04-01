@@ -1,9 +1,11 @@
 # nexisos
-Main repository for the NexisOS ISO installer source code and core tools for building and testin the distro.
+
+Main repository for the NexisOS ISO installer source code and core tools for building and testing the distro.
 
 ---
 
 ## Download ISO
+
 You can try the latest ISO build of NexisOS by downloading it from SourceForge:
 
 [Download NexisOS ISO](https://sourceforge.net/projects/nexisos/files/latest/download)
@@ -20,92 +22,151 @@ You can try the latest ISO build of NexisOS by downloading it from SourceForge:
 
 ---
 
-## 🔧 Building From Source Prerequisites
+## Project Structure
 
-### Buildroot:
-- build-essential
-- make
-- git
-- python3
-- wget
-- unzip
-- rsync
-- cpio
-- libncurses-dev
-- libssl-dev
-- bc
-- flex
-- bison
-- curl
-
-### Project:
-
-- Packages
-    - installer
-        - blank
-    - nexisos-core
-        - meson
-        - ninja
-        - gcc
-        - blake3 
-        - lmdb
-        - libarchive
-        - libcurl
-        - lz4
-        - zstd
-        - libseccomp
-        - libcap
-        - libselinux
-        - elfutils
-        - libsodium 
-
-- scripts
-    - blank
-
-- virtual testing
-    - QEMU + OVMF (UEFI support)
-
----
-
-## Build ISO Targets & Testing
-
-### Recommended Workflow
-#### initialize buildroot submodule
-git submodule update --init --recursive 
-
-### meson commands
-
-## Installer ISO Script
-
-
-Before the end-user installs the distro, UEFI or boot settings must be set.
-
-Once precondtions are met the iso launches the installer TUI.
-After setting the option blank the hardware.toml and defaults toml files are created/added.
+```
+nexisos/
+├── buildroot/                   # Buildroot git submodule (ISO base system)
+├── configs/                     # Kernel and system configuration files
+├── overlay/                     # Root filesystem overlay applied to the ISO
+├── packages/
+│   ├── nexisos-core/            # Core distro tooling (C, built with Meson + Ninja)
+│   │   ├── bin/
+│   │   │   ├── nexis/           # CLI entry point (nexis build, switch, rollback, etc.)
+│   │   │   ├── nexisctl/        # Service control interface (talks to nexis-init)
+│   │   │   ├── nexis-guard/     # Security orchestrator (ClamAV, Suricata, Tetragon)
+│   │   │   └── nexis-init/      # Custom PID 1 (epoll, pidfd, sd-bus D-Bus compat)
+│   │   ├── lib/
+│   │   │   ├── common/          # Shared utilities
+│   │   │   └── pm/              # Package manager library
+│   │   │       ├── build/       # Sandboxed build executor
+│   │   │       ├── config/      # TOML config loading, schema validation, lockfiles
+│   │   │       ├── core/        # Build orchestration, generation switch
+│   │   │       ├── files/       # Declarative file management, content addressing
+│   │   │       ├── fleet/       # Fleet deployment, profiles, machine management
+│   │   │       ├── generations/ # Generation management, rollback, GRUB entries
+│   │   │       ├── packages/    # Dependency resolution, fetching, caching
+│   │   │       ├── security/    # SELinux, immutability, permissions
+│   │   │       ├── services/    # Init service generation, initctl bridge
+│   │   │       ├── store/       # CAS store, LMDB metadata, GC, hashing
+│   │   │       ├── users/       # User/home/profile management
+│   │   │       └── vcs/         # Git integration (branches, tags)
+│   │   ├── include/nexis/       # Public headers
+│   │   ├── modules/             # Bundled TOML modules (profiles, hardware, services)
+│   │   ├── tests/               # Integration tests
+│   │   ├── bench/               # Benchmarks (store ops, etc.)
+│   │   ├── meson.build
+│   │   └── meson_options.txt
+│   └── tui-installer/           # TUI installer launched from the ISO
+├── scripts/
+│   ├── build_iso.sh             # Assemble final ISO from Buildroot + overlay + packages
+│   ├── build_rootfs.sh          # Build the root filesystem
+│   └── qemu.sh                  # Launch ISO in QEMU for testing
+├── build/                       # Build output (images, iso, rootfs)
+├── meson.build                  # Top-level Meson build definition
+├── meson_options.txt
+├── shell-buildroot.nix          # Nix shell for Buildroot dependencies
+└── shell-pkgs.nix               # Nix shell for package development
+```
 
 ---
 
-## Commands ran during install
+## Build Prerequisites
+
+### Buildroot host dependencies
+
+```bash
+sudo apt install build-essential make git python3 wget unzip rsync \
+    cpio libncurses-dev libssl-dev bc flex bison curl
+```
+
+### nexisos-core (C libraries)
+
+| Library | Purpose |
+| :------ | :------ |
+| `meson` + `ninja` | Build system |
+| `gcc` | C compiler |
+| `libblake3` | BLAKE3 content hashing (CAS store, package identity) |
+| `liblmdb` | Metadata DB — memory-mapped B+ tree for package index and generation history |
+| `libarchive` | Archive extraction and erofs image composition |
+| `libcurl` | Package fetching, binary substitution downloads |
+| `liblz4` | LZ4 compression for erofs generation images |
+| `libzstd` | Zstd compression for package distribution |
+| `libseccomp` | seccomp-BPF sandbox profiles for builds and services |
+| `libcap` | Capability dropping in nexis-init service spawning |
+| `libselinux` | SELinux context transitions, label-at-build for erofs images |
+| `libsystemd` | `sd-bus` for the `org.freedesktop.systemd1` D-Bus compatibility layer in nexis-init |
+| `elfutils` | ELF inspection for InterfaceHash (ABI-level rebuild decisions) |
+| `libsodium` | Cryptographic signing for package verification |
+
+### Virtual testing
+
+QEMU + OVMF (UEFI support) for booting the ISO locally.
+
+---
+
+## Building from Source
+
+### 1. Clone with submodules
+
+```bash
+git clone --recurse-submodules https://github.com/NexisOS/nexisos.git
+cd nexisos
+# Or if already cloned:
+git submodule update --init --recursive
+```
+
+### 2. Build nexisos-core
+
+```bash
+cd packages/nexisos-core
+meson setup builddir
+ninja -C builddir
+ninja -C builddir test    # run tests
+```
+
+### 3. Build the ISO
+
+```bash
+# From the repo root
+./scripts/build_rootfs.sh   # build root filesystem via Buildroot
+./scripts/build_iso.sh      # assemble ISO with overlay + packages
+```
+
+### 4. Test in QEMU
+
+```bash
+./scripts/qemu.sh           # boots the ISO with UEFI via OVMF
+```
+
+---
+
+## Installer Flow
+
+The live ISO boots into a TUI installer. Before installing, UEFI/Secure Boot settings should be configured in firmware.
+
+The installer walks through disk partitioning, locale, timezone, user creation, and profile selection. On completion it generates `hardware.toml` (auto-detected from the machine) and the base TOML configuration files, then runs the initial system build.
 
 <details>
-<summary>Click to see</summary>
+<summary>Commands ran during install</summary>
 
-- `nexis generate-hardware` → Regenerate `hardware.toml`
-- `nexis resolve-versions` → Update `nexis.lock` with latest versions
-- `nexis build` → Build system from config
-- `nexis switch` → Switch to new generation
-- `nexis rollback` → Rollback to previous generation
+- `nexis generate-hardware` — detect hardware and write `hardware.toml`
+- `nexis resolve-versions` — resolve declared packages and write `nexis.lock`
+- `nexis build` — build the system from config (CAS store → erofs generation image)
+- `nexis switch` — atomically switch to the new generation
+- `nexis rollback` — roll back to the previous generation
 
 </details>
 
 ---
 
-## ⚙️ Example TOML Configurations
+## Example TOML Configurations
 
 <details>
-<summary>Click to see</summary>
+<summary>Click to expand</summary>
 
 ### Minimal `config.toml`
+
 ```toml
 [system]
 hostname = "myhost"
@@ -143,7 +204,8 @@ fallback_to_source = true
 source = "https://github.com/vim/vim.git"
 ```
 
-### `hardware.toml`
+### `hardware.toml` (auto-generated by installer)
+
 ```toml
 [cpu]
 model = "amd_ryzen"
@@ -167,20 +229,8 @@ interfaces = [
 ]
 ```
 
-### `packages/desktop.toml`
-```toml
-[[packages]]
-name = "firefox"
-version = "latest"
-source = "https://github.com/mozilla/firefox.git"
+### `nexis.lock` (auto-generated by `nexis resolve-versions`)
 
-[[packages]]
-name = "steam"
-version = "latest"
-provider = "steam" # future version provider extension
-```
-
-### `nexis.lock`
 ```toml
 [[packages]]
 name = "firefox"
@@ -193,28 +243,25 @@ version = "6.10.1"
 resolved = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git?tag=v6.10.1"
 ```
 
-### Example init service in `nexis_init.toml`
-```toml
-[[packages]]
-name = ""
+### Service declaration in `services.toml`
 
-[packages.nexis-init_services.nginx]
-type = "process"
-command = "/usr/sbin/nginx -g 'daemon off;'"
-depends = ["network", "filesystem"]
+```toml
+[services.nginx]
+exec = "/usr/sbin/nginx"
+type = "notify"
+restart = "on-failure"
+restart_sec = 5
+requires = ["network-online.target"]
+after = ["network-online.target"]
 user = "nginx"
-working_directory = "/var/www"
-restart = "always"
-log_file = "/var/log/nginx/access.log"
-start_timeout = 30
+cgroup.memory_max = "512M"
+selinux.type = "httpd_t"
 enable = true
 ```
 
-### Declarative File Management
-Like Nix’s `writeText` or `environment.etc`, NexisPM allows declarative
-creation and tracking of files (configs, dotfiles, system files). Files are
-stored in `/nexis-store` with hash-based paths and symlinked into place,
-ensuring immutability and reproducibility.
+### Declarative file management
+
+Files are content-addressed in the store and symlinked into place, ensuring immutability and reproducibility.
 
 ```toml
 [[files]]
@@ -231,7 +278,6 @@ set -g -x PATH $PATH /nexis-store/bin
 alias ll="ls -la"
 '''
 mode = "0644"
-fleet = "?"
 owner = "myuser"
 group = "users"
 
@@ -240,61 +286,13 @@ path = "/home/myuser/.local/share/nexispm/test.txt"
 source = "files/test.txt"   # reference to repo-tracked file
 ```
 
-- `path` → target install path
-- `content` → inline text (hash stored in `/nexis-store`)
-- `source` → import an existing file into the store
-- `mode`, `owner`, `group` → permission metadata
-
-This gives one **unified method**: whether inline or external, all files are normalized into the store, then linked to their declared `path`.
-
-### Default `files.toml` Template
-A starter template for user and system file management:
-```toml
-# System Message of the Day
-[[files]]
-path = "/etc/motd"
-content = "Welcome to NexisOS — Declarative and Secure!"
-mode = "0644"
-owner = "root"
-group = "root"
-
-# User shell configuration
-[[files]]
-path = "/home/user/.bashrc"
-content = '''
-# Custom aliases
-alias ll="ls -la"
-export EDITOR=vim
-'''
-mode = "0644"
-owner = "user"
-group = "users"
-
-# Dotfile for fish shell
-[[files]]
-path = "/home/user/.config/fish/config.fish"
-content = '''
-set -g -x PATH $PATH /nexis-store/bin
-alias gs="git status"
-'''
-mode = "0644"
-owner = "user"
-group = "users"
-
-# Import external tracked file
-[[files]]
-path = "/home/user/.config/nvim/init.vim"
-source = "dotfiles/init.vim"
-mode = "0644"
-owner = "user"
-group = "users"
-```
+Fields: `path` (target install path), `content` (inline text) or `source` (import from repo), `mode`/`owner`/`group` (permissions). All files are normalized into the CAS store then linked to their declared path.
 
 </details>
 
 ---
 
-## 📚 Organization Resources
+## Organization Resources
 
 For general contribution, security, and governance policies across all NexisOS projects, see:
 
