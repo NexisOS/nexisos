@@ -8,8 +8,6 @@ Main repository for the NexisOS ISO installer source code and core tools for bui
 
 You can try the latest ISO build of NexisOS by downloading it from SourceForge:
 
-[Download NexisOS ISO](https://sourceforge.net/projects/nexisos/files/latest/download)
-
 > ⚠️ *Note: The ISO is currently experimental and intended for testing and feedback. Expect rapid iteration and updates.*
 
 <div align="center">
@@ -19,6 +17,8 @@ You can try the latest ISO build of NexisOS by downloading it from SourceForge:
 | ![nexisos](https://img.shields.io/github/actions/workflow/status/NexisOS/nexisos/main.yml?label=nexisos) | ![GitHub release](https://img.shields.io/github/v/release/NexisOS/nexisos?label=latest%20stable) |
 
 </div>
+
+[Download NexisOS ISO](https://sourceforge.net/projects/nexisos/files/latest/download)
 
 ---
 
