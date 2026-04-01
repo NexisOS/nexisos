@@ -1,0 +1,5 @@
+option('selinux',
+  type : 'boolean',
+  value : true,
+  description : 'Build with SELinux support',
+)

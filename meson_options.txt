@@ -1,0 +1,11 @@
+# Enable debug mode
+option('debug', type : 'boolean', value : true,
+       description : 'Enable debug mode')
+
+# ISO filename
+option('iso_name', type : 'string', value : 'nexisos.iso',
+       description : 'Name of the generated ISO')
+
+# Optimization level
+option('optimization', type : 'combo', choices : ['0', '1', '2', '3', 's', 'g'],
+       value : '2', description : 'Optimization level')

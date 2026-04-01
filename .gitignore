@@ -1,31 +1,21 @@
-# Prerequisites
-*.d
+# C/C++ Generated Files
 
 # Object files
 *.o
 *.ko
 *.obj
+*.lo
+*.lai
+*.slo
 *.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
+*.d
 
 # Libraries
-*.lib
 *.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
+*.lib
 *.so
 *.so.*
+*.dll
 *.dylib
 
 # Executables
@@ -36,11 +26,21 @@
 *.x86_64
 *.hex
 
-# Debug files
+# Precompiled Headers
+*.gch
+*.pch
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Debug files / symbols
 *.dSYM/
 *.su
 *.idb
 *.pdb
+*.dwo
 
 # Kernel Module Compile Results
 *.mod*
@@ -51,5 +51,55 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# debug information files
-*.dwo
+# Build Systems
+
+# Meson
+**/meson-logs/
+**/meson-info/
+**/*.ninja
+**/*.ninja_deps
+**/*.ninja_log
+**/.ninja_*
+
+# IDE / Editor / Project Metadata
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+
+# Vim swap
+*.swp
+
+# Emacs
+*~
+
+# Python / Nix / Other
+result/
+*.lock
+__pycache__/
+*.py[cod]
+
+# Temporary / System Files
+*.core
+*.log
+*.tmp
+*.bak
+*.temp
+*.orig
+.DS_Store
+Thumbs.db
+*~
+
+# gitkeep
+build/*
+build/images/*
+build/iso/*
+build/rootfs/*
+
+!build/.gitkeep
+!build/images/.gitkeep
+!build/iso/.gitkeep
+!build/rootfs/.gitkeep
