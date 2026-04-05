@@ -55,10 +55,7 @@ nexisos/
 ├── buildroot/                  # Buildroot submodule (ISO base system)
 ├── configs/                    # Buildroot defconfig, kernel configs
 ├── overlay/                    # rootfs overlay (files baked into the ISO)
-├── build/                      # build artifacts (gitignored)
-│   ├── rootfs/
-│   ├── iso/
-│   └── images/
+├── build/                      # final ISO output (gitignored)
 │
 ├── scripts/
 │   ├── build_rootfs.sh         # build root filesystem via Buildroot
@@ -67,78 +64,90 @@ nexisos/
 │
 ├── tests/                      # integration test fixtures
 │   └── fixtures/
-│       ├── configs/
-│       └── packages/
 ├── benches/                    # criterion benchmarks
 │
 ├── shell-buildroot.nix         # nix-shell for Buildroot/ISO builds
 ├── shell-pkgs.nix              # nix-shell for Rust crate development
-├── Dockerfile.dev              # container dev environment (non-nix)
+├── Dockerfile.dev              # container dev environment
 ├── .devcontainer/
 │   └── devcontainer.json       # VS Code / Codespaces config
 └── .envrc                      # direnv auto-activation for nix-shell
 ```
 
+ISOs are output as `build/nexisos-<version>-<arch>.iso` (e.g. `build/nexisos-0.1.0-x86_64.iso`). Buildroot intermediate artifacts stay in `buildroot/output/` and are never copied out.
+
 ---
 
-## Build Prerequisites
+## Development Environment
 
-### Option A: Nix (recommended)
+All contributors must use an ephemeral, isolated development environment regardless of host OS. This keeps builds reproducible and avoids polluting your system.
 
-Nix provides reproducible, hermetic development shells. Two separate shells keep Buildroot's FHS requirements isolated from normal Rust development.
+### Linux
+
+**Nix (recommended):**
 
 ```bash
-# Rust crate development
-nix-shell shell-pkgs.nix
-
-# Buildroot / ISO builds (FHS environment)
-nix-shell shell-buildroot.nix
+# Install Nix: https://nixos.org/download
+# Then:
+nix-shell shell-pkgs.nix          # Rust crate development
+nix-shell shell-buildroot.nix     # Buildroot / ISO builds (FHS sandbox)
 ```
 
 If you use [direnv](https://direnv.net/), the included `.envrc` auto-activates `shell-pkgs.nix` when you `cd` into the repo.
 
-### Option B: Container (Docker / Podman)
-
-For contributors without Nix:
+**Docker / Podman:**
 
 ```bash
-# Build the dev image
 docker build -f Dockerfile.dev -t nexisos-dev .
-
-# Enter the dev shell
 docker run -it --rm -v "$(pwd):/workspace" -w /workspace nexisos-dev
 ```
 
-### Option C: VS Code Dev Containers / GitHub Codespaces
+### macOS
 
-Open the repo in VS Code with the Dev Containers extension — it will auto-build from `.devcontainer/devcontainer.json`.
+macOS cannot build the ISO (Buildroot and the Linux kernel require a Linux host), but you can work on all Rust crates.
 
-### Option D: Manual setup
-
-#### Rust toolchain
+**Nix (recommended):**
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-rustup show   # reads rust-toolchain.toml automatically
+# Install Nix: https://nixos.org/download
+nix-shell shell-pkgs.nix
 ```
 
-#### System dependencies (Rust crates)
+**Docker (for full ISO builds):**
 
 ```bash
-# Debian/Ubuntu
-sudo apt install build-essential pkg-config libssl-dev \
-    libblake3-dev liblz4-dev libzstd-dev libseccomp-dev \
-    libcap-dev libselinux1-dev libdbus-1-dev libsodium-dev \
-    libelf-dev liblmdb-dev libarchive-dev libcurl4-openssl-dev
+docker build -f Dockerfile.dev -t nexisos-dev .
+docker run -it --rm -v "$(pwd):/workspace" -w /workspace nexisos-dev
 ```
 
-#### Buildroot host dependencies
+This gives you a full Linux environment inside the container where `make iso` will work.
 
-```bash
-sudo apt install make git python3 wget unzip rsync cpio \
-    libncurses-dev libssl-dev bc flex bison curl \
-    qemu-system-x86 ovmf
+### Windows
+
+Use WSL2 with any of the Linux methods above. Native Windows builds are not supported.
+
+```powershell
+# Install WSL2 if you haven't
+wsl --install -d Ubuntu-24.04
+
+# Then inside WSL:
+cd /mnt/c/Users/you/repos/nexisos
 ```
+
+From there, follow the Linux instructions (Nix or Docker). If using Docker Desktop on Windows, enable the WSL2 backend and run docker commands from inside WSL.
+
+### VS Code / GitHub Codespaces
+
+Open the repo in VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension — it auto-builds from `.devcontainer/devcontainer.json`. This works on all three platforms and in GitHub Codespaces with zero local setup.
+
+### Environment summary
+
+| Host OS | Rust crate dev | ISO builds | Method |
+|---------|---------------|------------|--------|
+| Linux | ✓ | ✓ | Nix shell, Docker, or manual |
+| macOS | ✓ | ✓ (via Docker) | Nix shell for Rust, Docker for ISO |
+| Windows | ✓ (WSL2) | ✓ (WSL2) | WSL2 + Nix or Docker |
+| Any | ✓ | ✓ | VS Code Dev Container / Codespaces |
 
 ---
 
@@ -162,7 +171,7 @@ make deny            # check licenses and advisories
 
 ```bash
 make rootfs          # build root filesystem via Buildroot
-make iso             # assemble bootable ISO
+make iso             # assemble bootable ISO → build/nexisos-<version>-<arch>.iso
 make qemu            # boot the ISO in QEMU with UEFI
 ```
 
@@ -333,18 +342,6 @@ source = "files/test.txt"   # reference to repo-tracked file
 Fields: `path` (target install path), `content` (inline text) or `source` (import from repo), `mode`/`owner`/`group` (permissions). All files are normalized into the CAS store then linked to their declared path.
 
 </details>
-
----
-
-## Development Environment
-
-| Method | File | Who it's for |
-|--------|------|--------------|
-| Nix shell | `shell-pkgs.nix`, `shell-buildroot.nix` | NixOS / Nix users |
-| direnv | `.envrc` | Auto-activate nix-shell on `cd` |
-| Docker | `Dockerfile.dev` | Any Linux/macOS with Docker |
-| Dev Container | `.devcontainer/devcontainer.json` | VS Code, Codespaces |
-| Manual | See prerequisites above | Direct install on host |
 
 ---
 

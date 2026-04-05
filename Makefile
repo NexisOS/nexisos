@@ -1,7 +1,11 @@
-.PHONY: help check build release test clippy fmt deny \
+.PHONY: help check build release test clippy fmt fmt-check deny \
        installer init guard cli ctl \
+       installer-static init-static \
        rootfs iso qemu \
        all clean
+
+VERSION := $(shell grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+ARCH    := $(shell uname -m)
 
 # Default target
 help: ## Show this help
@@ -66,8 +70,10 @@ init-static: ## Build static nexis-init for the ISO
 rootfs: ## Build root filesystem via Buildroot
 	./scripts/build_rootfs.sh
 
-iso: ## Assemble bootable ISO
+iso: ## Assemble bootable ISO → build/nexisos-$(VERSION)-$(ARCH).iso
+	@mkdir -p build
 	./scripts/build_iso.sh
+	@echo "ISO: build/nexisos-$(VERSION)-$(ARCH).iso"
 
 qemu: ## Boot the ISO in QEMU with UEFI
 	./scripts/qemu.sh
@@ -78,4 +84,4 @@ all: release rootfs iso ## Build everything: crates + rootfs + ISO
 
 clean: ## Remove build artifacts
 	cargo clean
-	rm -rf build/rootfs/* build/iso/* build/images/*
+	rm -f build/*.iso
