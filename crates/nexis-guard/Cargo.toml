@@ -1,0 +1,6 @@
+[package]
+name = "nexis-guard"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

@@ -1,0 +1,35 @@
+FROM ubuntu:24.04
+
+ARG RUST_VERSION=stable
+ARG DEBIAN_FRONTEND=noninteractive
+
+# System dependencies for Rust crate builds
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl ca-certificates git \
+    libssl-dev libblake3-dev liblz4-dev libzstd-dev \
+    libseccomp-dev libcap-dev libselinux1-dev libdbus-1-dev \
+    libsodium-dev libelf-dev liblmdb-dev libarchive-dev \
+    libcurl4-openssl-dev \
+    # Buildroot host tools
+    make python3 wget unzip rsync cpio \
+    libncurses-dev bc flex bison \
+    # ISO / disk tooling
+    xorriso squashfs-tools dosfstools e2fsprogs \
+    btrfs-progs xfsprogs cryptsetup-bin \
+    # QEMU
+    qemu-system-x86 ovmf \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain ${RUST_VERSION} \
+    && . /root/.cargo/env \
+    && rustup target add x86_64-unknown-linux-musl \
+    && cargo install cargo-deny cargo-nextest
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+ENV RUST_BACKTRACE=1
+
+WORKDIR /workspace
+
+CMD ["bash"]

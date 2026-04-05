@@ -1,0 +1,6 @@
+[package]
+name = "nexis-ctl"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

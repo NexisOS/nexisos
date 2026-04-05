@@ -1,0 +1,11 @@
+name: main
+
+on:
+  workflow_dispatch:
+
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say Hi
+        run: echo "test"

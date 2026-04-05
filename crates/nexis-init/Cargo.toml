@@ -1,0 +1,6 @@
+[package]
+name = "nexis-init"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
