@@ -25,14 +25,12 @@ You can try the latest ISO build of NexisOS by downloading it from SourceForge:
 ## Project Structure
 
 ```
-nexisos/
+.
 ├── Cargo.toml                  # workspace manifest
-├── Cargo.lock
-├── Makefile                    # build/test/iso orchestration
+├── Cargo.lock                  # pinned dependency versions for reproducible builds
+├── Makefile                    # build/test/ISO orchestration
 ├── rust-toolchain.toml         # pinned Rust toolchain
 ├── deny.toml                   # cargo-deny license/advisory config
-├── .cargo/
-│   └── config.toml             # cross-compile + static linking settings
 │
 ├── crates/
 │   ├── nexis-common/           # shared types, errors, fs helpers, logging
@@ -40,7 +38,7 @@ nexisos/
 │   ├── nexis-config/           # TOML config loading, schema validation, composition
 │   ├── nexis-pm/               # package manager (build, resolve, generations, fleet)
 │   ├── nexis-init/             # PID 1 init — single-threaded, pidfd, parallel boot
-│   ├── nexis-guard/            # security orchestrator (firewall, SELinux, suricata, tetragon, clamav)
+│   ├── nexis-guard/            # security orchestrator (firewall, SELinux, Suricata, Tetragon, ClamAV)
 │   ├── nexis-cli/              # `nexis` command-line tool
 │   ├── nexis-ctl/              # `nexisctl` runtime control tool
 │   └── nexis-installer/        # TUI installer (ratatui + crossterm)
@@ -66,12 +64,19 @@ nexisos/
 │   └── fixtures/
 ├── benches/                    # criterion benchmarks
 │
-├── shell-buildroot.nix         # nix-shell for Buildroot/ISO builds
-├── shell-pkgs.nix              # nix-shell for Rust crate development
-├── Dockerfile.dev              # container dev environment
-├── .devcontainer/
-│   └── devcontainer.json       # VS Code / Codespaces config
-└── .envrc                      # direnv auto-activation for nix-shell
+├── dev/                        # developer environment files
+│   ├── config.toml             # workspace-level Cargo config
+│   ├── shell-buildroot.nix     # nix-shell for Buildroot/ISO builds
+│   ├── shell-pkgs.nix          # nix-shell for Rust crate development
+│   ├── Dockerfile.dev          # optional Docker dev container
+│   ├── devcontainer.json       # optional VS Code/Codespaces config
+│   └── .envrc.example          # template for direnv auto-activation
+│
+├── .gitignore
+├── .gitmodules
+├── LICENSE
+├── README.md
+└── CHANGELOG.md
 ```
 
 ISOs are output as `build/nexisos-<version>-<arch>.iso` (e.g. `build/nexisos-0.1.0-x86_64.iso`). Buildroot intermediate artifacts stay in `buildroot/output/` and are never copied out.
@@ -89,8 +94,8 @@ All contributors must use an ephemeral, isolated development environment regardl
 ```bash
 # Install Nix: https://nixos.org/download
 # Then:
-nix-shell shell-pkgs.nix          # Rust crate development
-nix-shell shell-buildroot.nix     # Buildroot / ISO builds (FHS sandbox)
+nix-shell dev/shell-pkgs.nix          # Rust crate development
+nix-shell dev/shell-buildroot.nix     # Buildroot / ISO builds (FHS sandbox)
 ```
 
 If you use [direnv](https://direnv.net/), the included `.envrc` auto-activates `shell-pkgs.nix` when you `cd` into the repo.
@@ -98,7 +103,7 @@ If you use [direnv](https://direnv.net/), the included `.envrc` auto-activates `
 **Docker / Podman:**
 
 ```bash
-docker build -f Dockerfile.dev -t nexisos-dev .
+docker build -f dev/Dockerfile.dev -t nexisos-dev .
 docker run -it --rm -v "$(pwd):/workspace" -w /workspace nexisos-dev
 ```
 
@@ -110,13 +115,13 @@ macOS cannot build the ISO (Buildroot and the Linux kernel require a Linux host)
 
 ```bash
 # Install Nix: https://nixos.org/download
-nix-shell shell-pkgs.nix
+nix-shell dev/shell-pkgs.nix
 ```
 
 **Docker (for full ISO builds):**
 
 ```bash
-docker build -f Dockerfile.dev -t nexisos-dev .
+docker build -f dev/Dockerfile.dev -t nexisos-dev .
 docker run -it --rm -v "$(pwd):/workspace" -w /workspace nexisos-dev
 ```
 
