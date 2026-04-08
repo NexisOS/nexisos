@@ -1,120 +1,93 @@
-use anyhow::{Context, Result};
-use serde::Deserialize;
-
-use crate::util::cmd;
+use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub struct BlockDevice {
-    pub name: String,
     pub path: String,
-    pub size_bytes: u64,
     pub model: String,
-    pub removable: bool,
-    pub ro: bool,
+    pub size_bytes: u64,
 }
 
 impl BlockDevice {
     pub fn size_display(&self) -> String {
-        let gb = self.size_bytes as f64 / 1_073_741_824.0;
-        if gb >= 1.0 {
-            format!("{:.1} GiB", gb)
+        const GIB: u64 = 1024 * 1024 * 1024;
+        const MIB: u64 = 1024 * 1024;
+        if self.size_bytes >= GIB {
+            format!("{:.1} GiB", self.size_bytes as f64 / GIB as f64)
         } else {
-            format!("{} MiB", self.size_bytes / 1_048_576)
+            format!("{} MiB", self.size_bytes / MIB)
         }
     }
 }
 
-#[derive(Deserialize)]
-struct LsblkJson {
-    blockdevices: Vec<LsblkDevice>,
-}
-
-#[derive(Deserialize)]
-struct LsblkDevice {
-    name: String,
-    path: String,
-    size: u64,
-    model: Option<String>,
-    rm: bool,
-    ro: bool,
-    #[serde(rename = "type")]
-    dtype: String,
-}
-
-/// List all block devices suitable for installation.
+// ---------------------------------------------------------------------------
+// Real implementation
+// ---------------------------------------------------------------------------
+#[cfg(not(feature = "dry-run"))]
 pub fn list_disks() -> Result<Vec<BlockDevice>> {
-    let raw = cmd::run_stdout(
-        "lsblk",
-        &["-J", "-b", "-o", "NAME,PATH,SIZE,MODEL,RM,RO,TYPE"],
-    )
-    .context("failed to list block devices")?;
+    use std::fs;
 
-    let parsed: LsblkJson =
-        serde_json::from_str(&raw).context("failed to parse lsblk output")?;
+    let mut devices = Vec::new();
+    for entry in fs::read_dir("/sys/block")? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().to_string();
 
-    let disks = parsed
-        .blockdevices
-        .into_iter()
-        .filter(|d| d.dtype == "disk" && !d.ro)
-        .map(|d| BlockDevice {
-            name: d.name,
-            path: d.path,
-            size_bytes: d.size,
-            model: d.model.unwrap_or_default(),
-            removable: d.rm,
-            ro: d.ro,
-        })
-        .collect();
+        // Skip loop, ram, and dm devices.
+        if name.starts_with("loop")
+            || name.starts_with("ram")
+            || name.starts_with("dm-")
+            || name.starts_with("sr")
+        {
+            continue;
+        }
 
-    Ok(disks)
-}
+        let dev_path = format!("/dev/{name}");
+        let size_bytes = fs::read_to_string(format!("/sys/block/{name}/size"))
+            .unwrap_or_default()
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(0)
+            * 512;
 
-/// Wipe partition table.
-pub fn wipe_disk(device: &str) -> Result<()> {
-    cmd::run("wipefs", &["--all", device])?;
-    cmd::run("sgdisk", &["--zap-all", device])?;
-    Ok(())
-}
+        if size_bytes == 0 {
+            continue;
+        }
 
-/// Create a GPT partition layout with EFI + optional swap + root.
-pub fn partition_auto(device: &str, swap_size_mb: u64, use_swap: bool) -> Result<Vec<String>> {
-    wipe_disk(device)?;
+        let model = fs::read_to_string(format!("/sys/block/{name}/device/model"))
+            .unwrap_or_default()
+            .trim()
+            .to_string();
 
-    // Build sfdisk script.
-    let mut script = String::from("label: gpt\n");
-
-    // EFI system partition: 512 MiB.
-    script.push_str("size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name=EFI\n");
-
-    if use_swap && swap_size_mb > 0 {
-        script.push_str(&format!(
-            "size={}M, type=0657FD6D-A4AB-43C4-84E5-0933C84B4F4F, name=swap\n",
-            swap_size_mb
-        ));
+        devices.push(BlockDevice {
+            path: dev_path,
+            model,
+            size_bytes,
+        });
     }
 
-    // Root: rest of the disk.
-    script.push_str("type=4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709, name=root\n");
+    devices.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(devices)
+}
 
-    cmd::run_with_stdin("sfdisk", &[device], &script)?;
-
-    // Re-read partition table.
-    let _ = cmd::run("partprobe", &[device]);
-
-    // Return partition paths.
-    let mut parts = Vec::new();
-    let suffix = if device.ends_with(|c: char| c.is_ascii_digit()) {
-        "p"
-    } else {
-        ""
-    };
-    parts.push(format!("{device}{suffix}1")); // EFI
-    if use_swap {
-        parts.push(format!("{device}{suffix}2")); // swap
-        parts.push(format!("{device}{suffix}3")); // root
-    } else {
-        parts.push(format!("{device}{suffix}2")); // root (no swap)
-    }
-
-    Ok(parts)
+// ---------------------------------------------------------------------------
+// Dry-run mock
+// ---------------------------------------------------------------------------
+#[cfg(feature = "dry-run")]
+pub fn list_disks() -> Result<Vec<BlockDevice>> {
+    Ok(vec![
+        BlockDevice {
+            path: "/dev/sda".into(),
+            model: "NEXIS VDISK 50G".into(),
+            size_bytes: 50 * 1024 * 1024 * 1024,
+        },
+        BlockDevice {
+            path: "/dev/sdb".into(),
+            model: "Fake USB Stick".into(),
+            size_bytes: 16 * 1024 * 1024 * 1024,
+        },
+        BlockDevice {
+            path: "/dev/nvme0n1".into(),
+            model: "NEXIS NVMe 256G".into(),
+            size_bytes: 256 * 1024 * 1024 * 1024,
+        },
+    ])
 }

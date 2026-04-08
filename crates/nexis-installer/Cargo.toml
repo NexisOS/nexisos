@@ -8,6 +8,9 @@ description = "NexisOS TUI installer"
 name = "nexis-installer"
 path = "src/main.rs"
 
+[features]
+dry-run = []
+
 [dependencies]
 nexis-common = { path = "../nexis-common" }
 ratatui = "0.29"

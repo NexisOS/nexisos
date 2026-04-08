@@ -1,233 +1,123 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
-use crate::app::{DiskConfig, InstallConfig};
-use crate::system::{bootloader, crypt, fs};
-use crate::util::cmd;
+use crate::app::InstallConfig;
 
-const MOUNT_ROOT: &str = "/mnt/nexis";
-const ROOTFS_IMAGE: &str = "/run/nexis-installer/rootfs.tar.zst";
+/// Progress callback: (current_step, total_steps, description).
+pub type ProgressCb<'a> = dyn FnMut(usize, usize, &str) + 'a;
 
-/// Progress callback: (step_index, total_steps, description).
-pub type ProgressFn<'a> = &'a mut dyn FnMut(usize, usize, &str);
+// ---------------------------------------------------------------------------
+// Real implementation
+// ---------------------------------------------------------------------------
+#[cfg(not(feature = "dry-run"))]
+pub fn run_install(config: &InstallConfig, progress: &mut ProgressCb<'_>) -> Result<()> {
+    let total = 8;
 
-/// Run the full installation.
-pub fn run_install(config: &InstallConfig, progress: ProgressFn) -> Result<()> {
-    let disk = config
-        .disk
-        .as_ref()
-        .expect("disk config must be set before install");
-    let steps = count_steps(config);
-    let mut step = 0;
+    progress(1, total, "Partitioning disk");
+    partition_disk(config)?;
 
-    // 1. Partition the disk.
-    progress(step, steps, "Partitioning disk...");
-    let parts = crate::system::disk::partition_auto(
-        &disk.device,
-        if disk.use_swap { disk.swap_size_mb } else { 0 },
-        disk.use_swap,
-    )?;
-    step += 1;
+    progress(2, total, "Formatting filesystems");
+    format_filesystems(config)?;
 
-    // 2. Determine root device (may go through LUKS).
-    let (efi_part, swap_part, root_raw) = if disk.use_swap {
-        (&parts[0], Some(&parts[1]), &parts[2])
-    } else {
-        (&parts[0], None, &parts[1])
-    };
+    progress(3, total, "Mounting target");
+    mount_target(config)?;
 
-    let root_dev = if let Some(enc) = &disk.encryption {
-        if enc.enabled {
-            progress(step, steps, "Setting up encryption...");
-            crypt::luks_format(root_raw, &enc.passphrase)?;
-            let mapped = crypt::luks_open(root_raw, &enc.passphrase)?;
-            step += 1;
-            mapped
-        } else {
-            root_raw.clone()
-        }
-    } else {
-        root_raw.clone()
-    };
+    progress(4, total, "Installing base system");
+    install_base(config)?;
 
-    // 3. Create filesystems.
-    progress(step, steps, "Creating filesystems...");
-    fs::mkfs_efi(efi_part)?;
-    fs::mkfs(&root_dev, &disk.filesystem, "nexis-root")?;
-    if let Some(swap) = swap_part {
-        fs::mkswap(swap)?;
-    }
-    step += 1;
+    progress(5, total, "Configuring system");
+    configure_system(config)?;
 
-    // 4. Mount target.
-    progress(step, steps, "Mounting filesystems...");
-    fs::mount(&root_dev, MOUNT_ROOT)?;
-    let boot_efi = format!("{MOUNT_ROOT}/boot/efi");
-    std::fs::create_dir_all(&boot_efi)?;
-    fs::mount(efi_part, &boot_efi)?;
-    step += 1;
-
-    // 5. Extract rootfs.
-    progress(step, steps, "Extracting system image...");
-    cmd::run(
-        "tar",
-        &["--zstd", "-xpf", ROOTFS_IMAGE, "-C", MOUNT_ROOT],
-    )
-    .context("failed to extract rootfs image")?;
-    step += 1;
-
-    // 6. Write system configuration.
-    progress(step, steps, "Configuring system...");
-    write_system_config(config)?;
-    step += 1;
-
-    // 7. Install bootloader.
-    progress(step, steps, "Installing bootloader...");
-    if bootloader::is_efi() {
-        bootloader::install_grub_efi()?;
-    } else {
-        bootloader::install_grub_bios(&disk.device)?;
-    }
-    step += 1;
-
-    // 8. Set up users.
-    progress(step, steps, "Creating user accounts...");
+    progress(6, total, "Setting up users");
     setup_users(config)?;
-    step += 1;
 
-    // 9. Finalize.
-    progress(step, steps, "Finishing up...");
-    finalize()?;
+    progress(7, total, "Installing bootloader");
+    install_bootloader(config)?;
+
+    progress(8, total, "Finalizing");
+    finalize(config)?;
 
     Ok(())
 }
 
-fn count_steps(config: &InstallConfig) -> usize {
-    let mut n = 8; // base steps
-    if config
+#[cfg(not(feature = "dry-run"))]
+fn partition_disk(_config: &InstallConfig) -> Result<()> {
+    // TODO: real partitioning via sgdisk / sfdisk
+    todo!("real partition_disk")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn format_filesystems(_config: &InstallConfig) -> Result<()> {
+    todo!("real format_filesystems")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn mount_target(_config: &InstallConfig) -> Result<()> {
+    todo!("real mount_target")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn install_base(_config: &InstallConfig) -> Result<()> {
+    todo!("real install_base")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn configure_system(_config: &InstallConfig) -> Result<()> {
+    todo!("real configure_system")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn setup_users(_config: &InstallConfig) -> Result<()> {
+    todo!("real setup_users")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn install_bootloader(_config: &InstallConfig) -> Result<()> {
+    todo!("real install_bootloader")
+}
+
+#[cfg(not(feature = "dry-run"))]
+fn finalize(_config: &InstallConfig) -> Result<()> {
+    todo!("real finalize")
+}
+
+// ---------------------------------------------------------------------------
+// Dry-run mock — simulates each stage with a short sleep
+// ---------------------------------------------------------------------------
+#[cfg(feature = "dry-run")]
+pub fn run_install(config: &InstallConfig, progress: &mut ProgressCb<'_>) -> Result<()> {
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    let device = config
         .disk
         .as_ref()
-        .and_then(|d| d.encryption.as_ref())
-        .map_or(false, |e| e.enabled)
-    {
-        n += 1;
-    }
-    n
-}
+        .map(|d| d.device.as_str())
+        .unwrap_or("(none)");
 
-fn write_system_config(config: &InstallConfig) -> Result<()> {
-    let etc = format!("{MOUNT_ROOT}/etc/nexis");
-    std::fs::create_dir_all(&etc)?;
+    let stages: &[&str] = &[
+        "Partitioning disk",
+        "Formatting filesystems",
+        "Mounting target",
+        "Installing base system",
+        "Configuring system",
+        "Setting up users",
+        "Installing bootloader",
+        "Finalizing",
+    ];
 
-    // Write the system.toml with all user choices.
-    let mut toml_content = String::new();
-    toml_content.push_str("[system]\n");
+    let total = stages.len();
 
-    if let Some(hostname) = &config.hostname {
-        toml_content.push_str(&format!("hostname = \"{hostname}\"\n"));
-    }
-    if let Some(locale) = &config.locale {
-        toml_content.push_str(&format!("locale = \"{locale}\"\n"));
-    }
-    if let Some(keymap) = &config.keymap {
-        toml_content.push_str(&format!("keymap = \"{keymap}\"\n"));
-    }
-    if let Some(tz) = &config.timezone {
-        toml_content.push_str(&format!("timezone = \"{tz}\"\n"));
-    }
-    if let Some(profile) = &config.profile {
-        toml_content.push_str(&format!("\n[profile]\nname = \"{profile}\"\n"));
+    for (i, desc) in stages.iter().enumerate() {
+        let label = if i == 0 {
+            format!("{desc} ({device})")
+        } else {
+            desc.to_string()
+        };
+        progress(i + 1, total, &label);
+        // Simulate work — longer for "Installing base system".
+        let ms = if i == 3 { 1200 } else { 350 };
+        sleep(Duration::from_millis(ms));
     }
 
-    std::fs::write(format!("{etc}/system.toml"), toml_content)?;
-
-    // Hostname.
-    if let Some(hostname) = &config.hostname {
-        std::fs::write(format!("{MOUNT_ROOT}/etc/hostname"), hostname)?;
-    }
-
-    // Timezone.
-    if let Some(tz) = &config.timezone {
-        let tz_path = format!("/usr/share/zoneinfo/{tz}");
-        let link_path = format!("{MOUNT_ROOT}/etc/localtime");
-        let _ = std::fs::remove_file(&link_path);
-        std::os::unix::fs::symlink(&tz_path, &link_path)?;
-    }
-
-    // Locale.
-    if let Some(locale) = &config.locale {
-        std::fs::write(
-            format!("{MOUNT_ROOT}/etc/locale.conf"),
-            format!("LANG={locale}\n"),
-        )?;
-    }
-
-    // Keymap.
-    if let Some(keymap) = &config.keymap {
-        std::fs::write(
-            format!("{MOUNT_ROOT}/etc/vconsole.conf"),
-            format!("KEYMAP={keymap}\n"),
-        )?;
-    }
-
-    // fstab generation.
-    generate_fstab(config)?;
-
-    Ok(())
-}
-
-fn generate_fstab(config: &InstallConfig) -> Result<()> {
-    cmd::run_stdout("genfstab", &["-U", MOUNT_ROOT])
-        .and_then(|fstab| {
-            std::fs::write(format!("{MOUNT_ROOT}/etc/fstab"), fstab)
-                .context("failed to write fstab")
-        })
-        .or_else(|_| {
-            // Fallback: generate a minimal fstab if genfstab is not available.
-            let fstab = "# /etc/fstab - generated by nexis-installer\n\
-                         # <device>  <mount>  <type>  <options>  <dump>  <fsck>\n";
-            std::fs::write(format!("{MOUNT_ROOT}/etc/fstab"), fstab)
-                .context("failed to write fstab")
-        })
-}
-
-fn setup_users(config: &InstallConfig) -> Result<()> {
-    // Set root password.
-    if let Some(pass) = &config.root_password {
-        cmd::run_with_stdin(
-            "chroot",
-            &[MOUNT_ROOT, "chpasswd"],
-            &format!("root:{pass}\n"),
-        )?;
-    }
-
-    // Create user account.
-    if let Some(user) = &config.user {
-        let mut args = vec![
-            MOUNT_ROOT,
-            "useradd",
-            "-m",
-            "-s",
-            "/bin/bash",
-        ];
-        if user.is_admin {
-            args.extend_from_slice(&["-G", "wheel"]);
-        }
-        args.push(&user.username);
-        cmd::run("chroot", &args)?;
-
-        cmd::run_with_stdin(
-            "chroot",
-            &[MOUNT_ROOT, "chpasswd"],
-            &format!("{}:{}\n", user.username, user.password),
-        )?;
-    }
-
-    Ok(())
-}
-
-fn finalize() -> Result<()> {
-    // Sync and unmount.
-    cmd::run("sync", &[])?;
-    fs::umount(MOUNT_ROOT)?;
     Ok(())
 }
