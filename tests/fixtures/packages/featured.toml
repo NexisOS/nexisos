@@ -1,0 +1,59 @@
+schema = 1
+
+name     = "featured"
+version  = "2.0"
+revision = 1
+
+outputs = ["out", "dev", "doc"]
+
+[[source]]
+role = "primary"
+urls = ["https://example.org/featured-2.0.tar.xz"]
+hash = "sha256-r8w0AQPGZKGdxrJZ+bF6O5UYaTTb0k9jvHmvWyc4mtQ="
+
+[[source]]
+role  = "patch"
+urls  = ["https://example.org/featured-gcc15.patch"]
+hash  = "sha256-3q2+7w9dQx8kK1Vd1bnpMoiUlPRqFCJ0lnSbdQjaPZ4="
+strip = 1
+
+[build]
+builder = "meson"
+native-groups = ["gnu-build"]
+dependency-groups = ["compression"]
+environment = { SOURCE_DATE_EPOCH = "0" }
+
+[build.phases]
+check = { mode = "skip" }
+configure = { mode = "args", add = ["--buildtype=release"] }
+
+[features]
+conflicts = [["gtk3", "qt6"]]
+
+[features.gtk3]
+default       = true
+dependencies  = ["gtk3", "glib"]
+configure     = ["-Dgtk3=enabled"]
+configure-off = ["-Dgtk3=disabled"]
+
+[features.qt6]
+default       = false
+dependencies  = ["qt6-base"]
+configure     = ["-Dqt6=enabled"]
+configure-off = ["-Dqt6=disabled"]
+
+[features.docs]
+default       = false
+native        = ["doxygen"]
+outputs       = ["doc"]
+configure     = ["-Ddocs=true"]
+configure-off = ["-Ddocs=false"]
+
+[output.out]
+paths = ["/usr/bin/**", "/usr/lib/**/*.so.*"]
+
+[output.dev]
+paths = ["/usr/include/**"]
+
+[output.doc]
+paths = ["/usr/share/doc/**"]

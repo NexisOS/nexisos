@@ -1,0 +1,50 @@
+schema = 1
+
+name = "libreoffice"
+version = "25.2.5"
+revision = 1
+
+description = "LibreOffice office suite"
+homepage = "https://www.libreoffice.org"
+license = "MPL-2.0"
+
+[source]
+url = "https://download.documentfoundation.org/libreoffice/src/25.2.5/libreoffice-25.2.5.tar.xz"
+sha = ""
+
+[build]
+system = "autotools"
+
+# instead of long list use groups and seprate file
+native-groups = [
+  "gnu-build",
+]
+
+# instead of long list use groups and seprate file
+dependency-groups = [
+  "cpp",
+  "desktop",
+  "xml",
+  "image",
+  "network",
+  "database",
+  "compression",
+]
+
+configure-options = [
+  "--disable-debug",
+  "--disable-tests",
+]
+
+[features]
+gtk3 = true
+qt6 = false
+java = false
+help = false
+translations = true
+
+environment = [
+  "CC=gcc",
+  "CXX=g++",
+]
+

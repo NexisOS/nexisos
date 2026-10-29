@@ -1,0 +1,10 @@
+schema = 1
+
+[group.gnu-build]
+native = ["gcc", "binutils", "make", "pkg-config"]
+
+[group.compression]
+dependencies = ["zlib", "xz", "zstd"]
+
+[group.empty-on-purpose]
+dependencies = []

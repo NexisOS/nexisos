@@ -1,0 +1,38 @@
+name: NexisOS CI
+
+run-name: "NexisOS CI — ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: "Select the workflow to run"
+        required: true
+        type: choice
+        options:
+          - all
+          - lint
+          - tests
+          - build
+          - security
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: inputs.workflow == 'all' || inputs.workflow == 'lint'
+    uses: ./.github/workflows/lint.yml
+
+  tests:
+    if: inputs.workflow == 'all' || inputs.workflow == 'tests'
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    if: inputs.workflow == 'all' || inputs.workflow == 'build'
+    uses: ./.github/workflows/build.yml
+
+  security:
+    if: inputs.workflow == 'all' || inputs.workflow == 'security'
+    uses: ./.github/workflows/security.yml

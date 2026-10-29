@@ -1,0 +1,19 @@
+schema = 1
+
+name    = "misbound"
+version = "1.0"
+
+[[source]]
+role = "primary"
+urls = ["https://example.org/misbound-1.0.tar.gz"]
+hash = "sha256-r8w0AQPGZKGdxrJZ+bF6O5UYaTTb0k9jvHmvWyc4mtQ="
+
+[build]
+builder = "make"
+
+# This is the bug the format exists to catch. `outputs` here is bound to
+# [build], not to the document root, and the result is valid TOML.
+outputs = ["out", "dev"]
+
+[output.out]
+paths = ["/usr/bin/**"]

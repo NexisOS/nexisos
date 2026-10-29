@@ -1,0 +1,43 @@
+hostname = "defualt"
+timezone = "auto"
+local = "en_US.UTF-8"
+
+[boot]
+loader = ""
+efi = true
+kernel = ""
+
+[network]
+manager = "NetworkManager"
+dhcp = true
+
+[users.bob]
+uid = 1000
+groups = ["wheel", "audio", "video"]
+shell = "fish" # use run time path?
+
+packages = [
+  "firefox",
+  "mvp",
+]
+
+[display]
+server = "wayland"
+desktop = "plasma"
+
+[services]
+sshd = true
+cups = true
+bluetooth = true
+pipewire = true
+
+[hardware]
+audio = "pipewire"
+graphics = "mesa"
+
+[system]
+packages = [
+  "fish",
+  "vim",
+  "btop",
+]

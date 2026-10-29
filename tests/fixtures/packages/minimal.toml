@@ -1,0 +1,25 @@
+schema = 1
+
+name     = "zlib"
+version  = "1.3.1"
+revision = 0
+
+outputs = ["out", "dev"]
+
+[[source]]
+role = "primary"
+urls = ["https://zlib.net/zlib-1.3.1.tar.gz"]
+hash = "sha256-r8w0AQPGZKGdxrJZ+bF6O5UYaTTb0k9jvHmvWyc4mtQ="
+
+[build]
+builder = "autotools"
+native-groups = ["gnu-build"]
+
+[build.phases]
+check = { mode = "skip" }
+
+[output.out]
+paths = ["/usr/lib/**/*.so.*"]
+
+[output.dev]
+paths = ["/usr/include/**", "/usr/lib/pkgconfig/**"]
