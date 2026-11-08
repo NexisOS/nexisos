@@ -6,6 +6,11 @@ license     = "GPL-3.0-or-later"
 srcDir = "src"
 binDir = "bin"
 
+bin = @["nexis/main", "init/main", "tuiinstaller/main"]
+namedBin["nexis/main"] = "nexis"
+namedBin["init/main"] = "nexis-init"
+namedBin["tuiinstaller/main"] = "nexis-installer"
+
 requires "nim >= 2.2.0"
 requires "parsetoml >= 0.7.0"
 requires "checksums >= 0.2.0"
@@ -31,11 +36,6 @@ proc runTest(name, source: string) =
 
   exec "nim c -r --hints:off --warnings:off " &
        "-o:tests/bin/" & name & " " & source
-
-proc buildBinaries() =
-  nimc "bin/nexis", "src/nexis/main.nim"
-  nimc "bin/nexis-init", "src/init/main.nim"
-  nimc "bin/nexis-installer", "src/tuiinstaller/main.nim"
 
 proc requireDistroBuild() =
   if not fileExists("bin/nexis") or
@@ -73,23 +73,9 @@ proc runTests() =
             "installation", "partition", "plan", "session", "state", "ui"]:
     runTest "inst_" & t, "tests/unit/installer/test_" & t & ".nim"
 
-proc previewInstaller(args: string) =
-  exec "nim c -r --hints:off --warnings:off " &
-       "-o:bin/preview tools/preview.nim " & args
-
-# ---------------------------------------------------------------------------
-# NexisOS binaries
-# ---------------------------------------------------------------------------
-
-task build, "Build all NexisOS binaries":
-  buildBinaries()
-
 # ---------------------------------------------------------------------------
 # Installer development
 # ---------------------------------------------------------------------------
-
-task preview, "Preview the TUI installer":
-  previewInstaller "--all"
 
 task installer, "Run the installer locally in dry-run mode":
   nimc "bin/nexis-installer", "src/tuiinstaller/main.nim", release = false

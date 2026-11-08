@@ -223,23 +223,17 @@ See **[TODO.md](TODO.md)** for the current unblocking order and **[docs/roadmap.
 Requires **Nim 2.2+**.
 
 ```sh
-nimble buildNexis
-nimble buildInstaller
-nimble testInstaller
-
+nimble build -d:release
+nimble test
 nimble installer
-nimble preview
-nimble previewVt
-nimble animate
-nimble plan
-nimble genconfig
-
-nimble build
-nimble check
-nimble distro
+nimble doctor
+nimble iso
+nimble qemuCheck
+nimble run
 ```
 
-See **[QUICKSTART.md](QUICKSTART.md)** for the complete build and VM workflow.
+`nimble build` writes `nexis`, `nexis-init`, and `nexis-installer` to `bin/`.
+Run `nimble tasks` to list the development, ISO, and QEMU commands.
 
 ## What this repo does
 The goal is to make the installer iso with the distro's packages
